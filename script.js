@@ -1,13 +1,19 @@
 const game = Game();
-
+let playerTurn;
 function Gameboard(){
     //rows and columns are equal, so i can just do a line const
     const lines = 3;
     const board = [];
-    for (let i = 0; i < lines; i++) {
-        board[i] = [];
-        for (let j = 0; j < lines; j++) {
-            board[i].push(0);
+
+    const initBoard = () =>{
+        let table = document.getElementById("table-container").children.item('table');
+        table.children.item('tbody').innerHTML = "";
+        for (let i = 0; i < lines; i++) {
+            board[i] = [];
+            table.children.item('tbody').innerHTML += printRow(i);
+            for (let j = 0; j < lines; j++) {
+                board[i].push(0);
+            }
         }
     }
 
@@ -22,77 +28,55 @@ function Gameboard(){
         return gameBoard;
     };
 
-    const checkStatus = (player) => {
+    const checkStatus = (playerNumber) => {
         let lines = 3;
-        let winningValue = player.getPlayerNumber() * lines;
+        let winningValue = playerNumber * lines;
         let boardGame = getBoard(); 
-        // let winner = 0;
-
-        // checkStatusByRow(arrayTest, player);
-        // checkStatusByColumn(arrayTest, player);
-        // checkStatusByDiagonal(arrayTest, player);
-        // checkStatusByReversedDiagonal(arrayTest, player);
-
-        return pipe(checkStatusByRow,
-             checkStatusByColumn,
-             checkStatusByDiagonal,
-             checkStatusByReversedDiagonal)({boardGame, winningValue});
+        let winner = 0;
+        
+        if(
+        checkStatusByRow(boardGame, playerNumber, winningValue) || 
+        checkStatusByColumn(boardGame, playerNumber, winningValue) || 
+        checkStatusByDiagonal(boardGame, playerNumber, winningValue) || 
+        checkStatusByReversedDiagonal(boardGame, playerNumber, winningValue)){
+            winner =  playerNumber;
+        }
+        return winner;
     }
-    return {setSquare, getBoard, checkStatus};
+    return {setSquare, getBoard, checkStatus, initBoard};
 }
 
 function Game(){
-    const players = [CreatePlayer(1, "juan"), CreatePlayer(2, "tomas")];
-    let playerIndex = Math.floor(Math.random() * 2) + 1; // random number beetween 1 and 2
+    const players = [CreatePlayer(1, "jugador 1"), CreatePlayer(2, "jugador 2")];
     const gameboard = Gameboard();
+    let started = false;
+    let finish;
+    let player;
+    let winner; //0 draw
     
     const startGame = () => {
-        let finish = false;
-        let player = players[playerIndex-1];
-        let winner = 0; //0 draw
+        finish = false;
+        playerTurn = Math.floor(Math.random() * 2) + 1;
+        player = players[playerTurn-1];
+        winner = 0; //0 draw
+        gameboard.initBoard();
 
-        //one play
-        playerIndex = 1;
-        player = players[playerIndex-1];
-        gameboard.setSquare(0,0,playerIndex, true);
-        gameboard.setSquare(0,1,playerIndex, true);
-
-        console.log(`player ${playerIndex} turn`);
-
-        playDone = player.play(gameboard, true);
-
-        if(!playDone){
-            finish = true;
-        }
-
-        winner = gameboard.checkStatus(player);
-        /*
-        do{
-            //sim game
-            playerIndex = playerIndex == 1?2:1;
-            player = players[playerIndex-1];
-
-            console.log(`player ${playerIndex} turn`);
-
-            playDone = player.play(gameboard);
-
-            if(!playDone){
-                finish = true;
-            }
-
-            winner = gameboard.checkStatus(player);
-
-            if(winner != 0){
-                console.log(`${player.getName()} won!!!`);
-                finish = true;
-            }
-            console.log(gameboard.getBoard());
-        }while(!finish);
-        */
+        document.getElementById("turno").innerHTML = "Le toca a " + playerTurn;
         
+        Array.from(document.getElementsByClassName("square")).forEach( (e) =>{
+            e.disabled = false;
+        })
+        
+        return playerTurn;
+    }
+    const setFinish = (status) => {
+        finish = status;
+    }
+    const getGameData = () => {
+        return {players, playerTurn, finish}
     }
 
-    return {gameboard, startGame};
+    return {gameboard, startGame, getGameData, setFinish};
 }
 
 function CreatePlayer (playerNumber, name) {
@@ -102,44 +86,59 @@ function CreatePlayer (playerNumber, name) {
     const getScore = () => score;
     const addScore = () => score++;
 
-    const play = (board, showPlay = false) => {
-        let squareFound = false;
-        board.getBoard().
-            forEach( (array, row) => {
-                array.forEach( (value, column) => {
-                    //marca el primer valor disponible que hay
-                    if(!squareFound && value == 0){
-                        board.setSquare(row,column,playerNumber, showPlay);
-                        squareFound = true;
-                    }
-                })
+    const play = (board, row, column, showPlay = false) => {
+        board.setSquare(row,column, getPlayerNumber(), showPlay);
+        if( board.checkStatus(getPlayerNumber()) ){
+            game.setFinish(true);
+
+            document.getElementById("turno").innerHTML = "ganó el jugador " +  getPlayerNumber();
+            
+            Array.from(document.getElementsByClassName("square")).forEach( (e) =>{
+                e.disabled = true;
             });
-        return squareFound;
+
+        }
+        
+        return getPlayerNumber() == 1?2:1;
     }
 
     return { getName, getPlayerNumber, getScore, addScore, play};
 }
-
-function checkStatusByRow(board, winningValue){
-    return board
-        .map( arrayRow => arrayRow.reduce( (acc, currentVal) => acc + currentVal))
-            .some( acc => acc == winningValue);
+function checkStatusByRow(board, player, winningValue){
+    let flattenBoard = board.flat();
+    let breakPoint = [0,2,5];
+    let winner = false;
+    for(let i = 0; i < breakPoint.length ; i++){
+        let startingPoint = breakPoint[i];
+        let acc = 0;
+        for(let j = startingPoint; j <= startingPoint + 3 ; j++){
+            if(flattenBoard[j] == player){
+                acc += flattenBoard[j];
+            }
+        }
+        if(acc == winningValue){
+            winner = true;
+            break
+        }
+    
+    }
+    return winner;
 }
-function checkStatusByColumn(board, plawinningValueyer){
+function checkStatusByColumn(board, player, winningValue){
     board = transposeMatrix(board);
-    checkStatusByRow(board, winningValue);
+    return checkStatusByRow(board, player, winningValue);
 }
-function checkStatusByDiagonal(board, winningValue){
+function checkStatusByDiagonal(board, player, winningValue){
     let acum = 0;
     board.forEach( (arrayRow, row) => {
-        acum += arrayRow.filter( (value, column) => column == row )[0];
+        acum += arrayRow.filter( (val, column) => (val == player && column == row) )[0];
     })
     return acum == winningValue
 }
-function checkStatusByReversedDiagonal(board, winningValue){
+function checkStatusByReversedDiagonal(board, player, winningValue){
     let acum = 0;
     board.forEach( (arrayRow, row) => {
-        acum += arrayRow.find( (val, column) => row + column == 2)
+        acum += parseInt(arrayRow.filter( (val, column) => (val == player && row + column == 2)));
     })
     return acum == winningValue
 }
@@ -156,34 +155,32 @@ function transposeMatrix(matrix){
 }
 
 window.addEventListener('load', () => {
-
-    // game.startGame();
-    let player = 1;
-    const arrayTest = [
-        [1, 1, 1],
-        [0, 1, 0],
-        [0, 0, 1]
-    ]
-
-    checkStatusByRow(arrayTest, player);
-    checkStatusByColumn(arrayTest, player);
-    checkStatusByDiagonal(arrayTest, player);
-    checkStatusByReversedDiagonal(arrayTest, player);
-
-
-    //reversed diagonal
-    //2 - 4 - 6
-            
-    //check if there is any posible plays
-    //there is
-    //  1º player plays something rnd
-    //  mark selected squares
-    //  get posible squares
-    //there isn't 
-    // check if anyone won
-    // someone did
-    //      add schore to that player
-    // no one did
-    //      its a draw
-    // restart game
+    game.startGame();
 })
+
+function squareClicked(btn, player){
+    let row = btn.getAttribute('data-row');
+    let column = btn.getAttribute('data-column');
+    
+    playerTurn = game.getGameData().players[player-1].play(game.gameboard, row, column);
+console.log(game.getGameData());
+    if(!game.getGameData().finish){
+        document.getElementById("turno").innerHTML = "Le toca a " + playerTurn;
+    }
+
+    btn.innerHTML = player == 1?'X':'O';
+}
+function printRow(row){
+    let board = "<tr>";
+    for(let i = 0 ; i < 3 ; i++){
+        board += printData(row, i);
+    }
+    return board;
+}
+function printData(row, column){
+    return `<td><button class="square" data-row = "${row}" data-column = "${column}" onclick="squareClicked(this, playerTurn)"><p></p></button></td>`;
+}
+
+function restartGame(){
+   game.startGame(); 
+}
